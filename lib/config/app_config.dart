@@ -13,13 +13,15 @@ import 'package:flutter/material.dart';
 /// All settings are documented inline for easy customization.
 class AppConfig {
   // ==================== APP IDENTITY ====================
-  static const String appName = 'Switcheats';
+  static const String appName = 'SuperFast Food';
   static const String appLogoPath = 'assets/images/logo.png';
+  static const String splashLogoPath = 'assets/images/splashLogo.png';
 
   // ==================== COLORS & THEME ====================
-  static const Color primaryColor = Color(0xFFB3B3B3); // Indigo
-  static const Color secondaryColor = Color(0xFFB3B3B3); // Purple
-  static const Color accentColor = Color(0xFFB3B3B3); // Pink
+  // App's teal/green brand color matching the website header
+  static const Color primaryColor = Color(0xFF8E4692); // Teal
+  static const Color secondaryColor = Color(0xFF0A9DAA); // Teal Light
+  static const Color accentColor = Color(0xFF05606A); // Teal Dark
 
   // ==================== DIALOG COLORS ====================
   // Exit Dialog - Light Theme
@@ -32,31 +34,39 @@ class AppConfig {
   static const Color exitDialogBackgroundDark = Color(0xFF1E1E1E); // Dark Gray
   static const Color exitDialogTitleColorDark = Color(0xFFFFFFFF); // White
   static const Color exitDialogTextColorDark = Color(0xFFB3B3B3); // Light Gray
-  static const Color exitDialogCancelColorDark =
-      Color(0xFFB3B3B3); // Light Gray
+  static const Color exitDialogCancelColorDark = Color(
+    0xFFB3B3B3,
+  ); // Light Gray
 
   // Exit Dialog - Common
   static const Color exitDialogButtonColor = primaryColor; // Exit button color
+  static const Color exitDialogButtonChangedColor = Colors.red;
   static const double exitDialogBorderRadius = 20.0; // Dialog corner radius
 
   // ==================== STATUS BAR COLORS ====================
-  // Light Theme Status Bar
-  static const Color statusBarColorLight = Color(0x00000000); // Transparent
+  // App Theme Status Bar - matches the teal website header
+  static const Color statusBarColorLight = Color(
+    0xFF087B84,
+  ); // Teal - matches app header
   static const Brightness statusBarIconBrightnessLight =
-      Brightness.dark; // Dark icons
+      Brightness.light; // Light icons on teal background
   static const Color navigationBarColorLight = Color(0xFFFFFFFF); // White
   static const Brightness navigationBarIconBrightnessLight = Brightness.dark;
 
   // Dark Theme Status Bar
-  static const Color statusBarColorDark = Color(0x00000000); // Transparent
+  static const Color statusBarColorDark = Color(0xFF05606A); // Dark Teal
   static const Brightness statusBarIconBrightnessDark =
       Brightness.light; // Light icons
   static const Color navigationBarColorDark = Color(0xFF121212); // Dark Gray
   static const Brightness navigationBarIconBrightnessDark = Brightness.light;
 
+  // The primary teal color used for the status bar (same as app header)
+  static const Color appThemeStatusBarColor = Color(0xFF087B84);
+  static const Color appThemeStatusBarColorDark = Color(0xFF05606A);
+
   // ==================== WEB URL CONFIGURATION ====================
   // ⚠️ CHANGE THIS URL TO YOUR WEB APPLICATION ⚠️
-  static const String webUrl = 'https://switcheats.com/food/user';
+  static const String webUrl = 'https://superfastfood.in/food/user';
 
   static const String notificationIcon =
       '@mipmap/ic_launcher'; // Default app launcher icon
@@ -77,21 +87,25 @@ class AppConfig {
 
   // ==================== API CONFIGURATION ====================
   // Base URL for API endpoints (update this with your actual API base URL)
-  // static const String apiBaseUrl = 'https://www.majdoorsathi.com/api/';
-  static const String apiBaseUrl = 'https://switcheats.com/api';
-  // https://api.majdoorsathi.com/api/auth/verify-otp
-  static const String fcmTokenUrl =
-     
-      'https://switcheats.com/api/v1/fcm-tokens/mobile/save';
+  static String termsAndConditionsUrl = "https://appzeto.com/terms";
 
+  // Native Android version cached at startup
+  static int androidSdkInt = 35; // Default to edge-to-edge (Android 15+)
+
+  static const String apiBaseUrl = 'https://superfastfood.in/api';
+
+  static const String fcmTokenUrl =
+      'https://superfastfood.in/api/v1/fcm-tokens/mobile/save';
+
+  //https://api.Mobasket.com/api/notification/user/token
   // ==================== SPLASH SCREEN ====================
   static const int splashDurationSeconds = 2;
 
   // ==================== ONBOARDING ====================
   static const List<OnboardingPage> onboardingPages = [
     OnboardingPage(
-      title: 'Welcome to Dadexpress',
-      description: 'Experience seamless delivery with the Dadexpress app.',
+      title: 'Welcome to Mobasket',
+      description: 'Experience seamless delivery with the Mobasket app.',
       imagePath: 'assets/onboarding/onboarding1.png',
     ),
     OnboardingPage(

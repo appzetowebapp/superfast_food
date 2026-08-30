@@ -1,22 +1,22 @@
 {
   "project_info": {
-    "project_number": "495091502782",
-    "firebase_url": "https://switcheats-2aff2-default-rtdb.asia-southeast1.firebasedatabase.app",
-    "project_id": "switcheats-2aff2",
-    "storage_bucket": "switcheats-2aff2.firebasestorage.app"
+    "project_number": "983730882946",
+    "firebase_url": "https://superfast-9fb35-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "superfast-9fb35",
+    "storage_bucket": "superfast-9fb35.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:495091502782:android:7cdc0976684254089f18ef",
+        "mobilesdk_app_id": "1:983730882946:android:8007af7b2101590d2a279b",
         "android_client_info": {
-          "package_name": "com.switcheats.delivery"
+          "package_name": "com.superfast.delivery"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDbvls3C97OMgQ1xIjkjM_fnf8ofpoJT6Q"
+          "current_key": "AIzaSyA-C_eX3qQlRmY6nAVMxTTUXZ772yunPRM"
         }
       ],
       "services": {
@@ -27,15 +27,15 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:495091502782:android:9f9eda217b22f2149f18ef",
+        "mobilesdk_app_id": "1:983730882946:android:6ad18f8427fd5f8d2a279b",
         "android_client_info": {
-          "package_name": "com.switcheats.restaurant"
+          "package_name": "com.superfast.restaurant"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDbvls3C97OMgQ1xIjkjM_fnf8ofpoJT6Q"
+          "current_key": "AIzaSyA-C_eX3qQlRmY6nAVMxTTUXZ772yunPRM"
         }
       ],
       "services": {
@@ -46,15 +46,34 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:495091502782:android:15b1c8ea802d489f9f18ef",
+        "mobilesdk_app_id": "1:983730882946:android:784f60732dd3c2c92a279b",
         "android_client_info": {
-          "package_name": "com.switcheats.user"
+          "package_name": "com.superfast.user"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDbvls3C97OMgQ1xIjkjM_fnf8ofpoJT6Q"
+          "current_key": "AIzaSyA-C_eX3qQlRmY6nAVMxTTUXZ772yunPRM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983730882946:android:f0008325137e014b2a279b",
+        "android_client_info": {
+          "package_name": "com.superfast.vender"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-C_eX3qQlRmY6nAVMxTTUXZ772yunPRM"
         }
       ],
       "services": {
