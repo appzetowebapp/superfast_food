@@ -6,7 +6,6 @@ class PrefsUtil {
   static const String _keyFirstLaunch = 'first_launch';
   static const String _keyThemeMode = 'theme_mode';
   static const String _keyPhoneNumber = 'phone_number';
-  static const String _keyUserId = 'user_id';
 
   static SharedPreferences? _prefs;
 
@@ -82,26 +81,14 @@ class PrefsUtil {
     await instance.remove(_keyPhoneNumber);
   }
 
-  // ==================== USER ID ====================
-
-  /// Save user ID (from backend)
-  static Future<void> setUserId(String userId) async {
-    await instance.setString(_keyUserId, userId);
-  }
-
-  /// Get saved user ID
-  static String? getUserId() {
-    return instance.getString(_keyUserId);
-  }
-
-  /// Clear user ID
-  static Future<void> clearUserId() async {
-    await instance.remove(_keyUserId);
-  }
-
-  // ==================== AUTH TOKEN ====================
+  // ==================== AUTH TOKENS & USER INFO ====================
   
   static const String _keyAccessToken = 'access_token';
+  static const String _keyRefreshToken = 'refresh_token';
+  static const String _keyUserId = 'user_id';
+  static const String _keyUserName = 'user_name';
+  static const String _keyUserEmail = 'user_email';
+  static const String _keyUserAvatar = 'user_avatar';
 
   /// Save API access token
   static Future<void> setAccessToken(String token) async {
@@ -116,6 +103,72 @@ class PrefsUtil {
   /// Clear API access token
   static Future<void> clearAccessToken() async {
     await instance.remove(_keyAccessToken);
+  }
+
+  /// Save API refresh token
+  static Future<void> setRefreshToken(String token) async {
+    await instance.setString(_keyRefreshToken, token);
+  }
+
+  /// Get API refresh token
+  static String? getRefreshToken() {
+    return instance.getString(_keyRefreshToken);
+  }
+
+  /// Clear API refresh token
+  static Future<void> clearRefreshToken() async {
+    await instance.remove(_keyRefreshToken);
+  }
+
+  /// Save User ID
+  static Future<void> setUserId(String id) async {
+    await instance.setString(_keyUserId, id);
+  }
+
+  /// Get User ID
+  static String? getUserId() {
+    return instance.getString(_keyUserId);
+  }
+
+  /// Save User Name
+  static Future<void> setUserName(String name) async {
+    await instance.setString(_keyUserName, name);
+  }
+
+  /// Get User Name
+  static String? getUserName() {
+    return instance.getString(_keyUserName);
+  }
+
+  /// Save User Email
+  static Future<void> setUserEmail(String email) async {
+    await instance.setString(_keyUserEmail, email);
+  }
+
+  /// Get User Email
+  static String? getUserEmail() {
+    return instance.getString(_keyUserEmail);
+  }
+
+  /// Save User Avatar URL
+  static Future<void> setUserAvatar(String avatar) async {
+    await instance.setString(_keyUserAvatar, avatar);
+  }
+
+  /// Get User Avatar URL
+  static String? getUserAvatar() {
+    return instance.getString(_keyUserAvatar);
+  }
+
+  /// Clear all user auth and profile data
+  static Future<void> clearUserData() async {
+    await instance.remove(_keyAccessToken);
+    await instance.remove(_keyRefreshToken);
+    await instance.remove(_keyPhoneNumber);
+    await instance.remove(_keyUserId);
+    await instance.remove(_keyUserName);
+    await instance.remove(_keyUserEmail);
+    await instance.remove(_keyUserAvatar);
   }
 
   // ==================== CLEAR ALL ====================

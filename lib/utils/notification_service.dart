@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_master_app/services/api_service.dart';
 import 'package:webview_master_app/config/app_config.dart';
 import 'dart:io' show Platform;
@@ -21,9 +22,12 @@ class NotificationService {
 
   bool _isInitialized = false;
 
-  // Track shown notifications to prevent duplicates
+  // Track shown notifications to prevent duplicates by message ID
   final Set<String> _shownNotificationIds = <String>{};
   final Map<String, DateTime> _notificationTimestamps = <String, DateTime>{};
+
+  // Content-based dedup: prevents backend from sending same notification twice in quick succession
+  final Map<String, DateTime> _contentDedupeCache = <String, DateTime>{};
 
   /// Initialize notification service
   Future<void> initialize() async {
@@ -125,10 +129,14 @@ class NotificationService {
     }
   }
 
-  /// Handle foreground FCM messages
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    debugPrint('📨 Foreground message received: ${message.messageId}');
-    debugPrint('📨 Message data: ${message.data}');
+    debugPrint('═════════ FOREGROUND NOTIFICATION ═════════');
+    debugPrint('🆔 Message ID: ${message.messageId}');
+    debugPrint('🔔 Notification: ${message.notification?.title} / ${message.notification?.body}');
+    debugPrint('📦 Data payload: ${message.data}');
+    debugPrint('🖼️ Image URL: ${message.notification?.android?.imageUrl ?? message.notification?.apple?.imageUrl}');
+    debugPrint('🕒 Time: ${DateTime.now()}');
+    debugPrint('═══════════════════════════════════════════');
 
     RemoteNotification? notification = message.notification;
     Map<String, dynamic>? data = message.data;
@@ -140,15 +148,43 @@ class NotificationService {
     _cleanOldNotificationIds();
 
     if (notification != null) {
-      debugPrint('📨 Notification title: ${notification.title}');
-      debugPrint('📨 Notification body: ${notification.body}');
+      // Fall back to data payload when notification fields are null (backend sends empty notification object)
+      final String resolvedTitle = (notification.title?.isNotEmpty == true)
+          ? notification.title!
+          : (data['title']?.toString() ?? '');
+      final String resolvedBody = (notification.body?.isNotEmpty == true)
+          ? notification.body!
+          : (data['body']?.toString() ?? data['message']?.toString() ?? '');
+
+      debugPrint('🔔 Notification title: $resolvedTitle');
+      debugPrint('🔔 Notification body: $resolvedBody');
+
+      // Skip notifications with no meaningful content
+      if (resolvedTitle.trim().isEmpty ||
+          (resolvedTitle == 'Notification' && resolvedBody.trim().isEmpty)) {
+        debugPrint('⚠️ Skipping empty/invalid notification (no title or body)');
+        return;
+      }
+
+      // In-memory dedup (same isolate, fast)
+      if (_isRecentDuplicate(resolvedTitle, resolvedBody)) {
+        debugPrint('⚠️ Duplicate notification suppressed (in-memory): $resolvedTitle');
+        return;
+      }
+
+      // Cross-isolate dedup: catches duplicates where one message was processed
+      // by the background handler and the next arrives in the foreground
+      if (await _isPersistedDuplicate(resolvedTitle, resolvedBody)) {
+        debugPrint('⚠️ Duplicate notification suppressed (cross-isolate): $resolvedTitle');
+        return;
+      }
 
       // Create a unique ID - use messageId if available, otherwise create from content
       final String uniqueId = notificationId.isNotEmpty
           ? notificationId
-          : '${notification.title}_${notification.body}_${message.sentTime?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch}';
+          : '${resolvedTitle}_${resolvedBody}_${message.sentTime?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch}';
 
-      // Check if this notification was already shown (prevent duplicates)
+      // Check if this notification was already shown (prevent duplicates by message ID)
       if (_shownNotificationIds.contains(uniqueId)) {
         debugPrint('⚠️ Duplicate notification detected, skipping: $uniqueId');
         return;
@@ -157,6 +193,7 @@ class NotificationService {
       // Mark as shown
       _shownNotificationIds.add(uniqueId);
       _notificationTimestamps[uniqueId] = DateTime.now();
+      _markContentShown(resolvedTitle, resolvedBody);
 
       // Ensure notification service is initialized
       if (!_isInitialized) {
@@ -176,8 +213,8 @@ class NotificationService {
 
       // Show notification
       await showNotification(
-        title: notification.title ?? 'Notification',
-        body: notification.body ?? '',
+        title: resolvedTitle,
+        body: resolvedBody,
         payload: data.toString(),
         imageUrl: notification.android?.imageUrl ??
             notification.apple?.imageUrl?.toString(),
@@ -185,8 +222,8 @@ class NotificationService {
       );
     } else if (data.isNotEmpty) {
       // Handle data-only messages
-      debugPrint('📨 Data-only message received');
-      final title = data['title']?.toString() ?? 'Notification';
+      debugPrint('🔔 Data-only message received');
+      final title = data['title']?.toString() ?? '';
       final body =
           data['body']?.toString() ?? data['message']?.toString() ?? '';
 
@@ -195,7 +232,25 @@ class NotificationService {
           ? notificationId
           : '${title}_${body}_${message.sentTime?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch}';
 
-      // Check for duplicates
+      // Skip notifications with no meaningful content
+      if (title.trim().isEmpty || (title == 'Notification' && body.trim().isEmpty)) {
+        debugPrint('⚠️ Skipping empty/invalid data-only notification');
+        return;
+      }
+
+      // In-memory dedup (same isolate, fast)
+      if (_isRecentDuplicate(title, body)) {
+        debugPrint('⚠️ Duplicate data-only notification suppressed (in-memory): $title');
+        return;
+      }
+
+      // Cross-isolate dedup
+      if (await _isPersistedDuplicate(title, body)) {
+        debugPrint('⚠️ Duplicate data-only notification suppressed (cross-isolate): $title');
+        return;
+      }
+
+      // Check for duplicates by message ID
       if (_shownNotificationIds.contains(uniqueId)) {
         debugPrint(
             '⚠️ Duplicate data-only notification detected, skipping: $uniqueId');
@@ -205,6 +260,7 @@ class NotificationService {
       // Mark as shown
       _shownNotificationIds.add(uniqueId);
       _notificationTimestamps[uniqueId] = DateTime.now();
+      _markContentShown(title, body);
 
       if (!_isInitialized) {
         await initialize();
@@ -238,6 +294,46 @@ class NotificationService {
       _shownNotificationIds.remove(id);
       _notificationTimestamps.remove(id);
     }
+
+    // Clean content dedup cache (30-second window)
+    _contentDedupeCache.removeWhere(
+      (_, ts) => now.difference(ts).inSeconds > 30,
+    );
+  }
+
+  /// Returns true if identical content was shown within the last 30 seconds
+  /// (in-memory check — same isolate only).
+  bool _isRecentDuplicate(String title, String body) {
+    final lastShown = _contentDedupeCache['${title}_$body'];
+    if (lastShown == null) return false;
+    return DateTime.now().difference(lastShown).inSeconds < 30;
+  }
+
+  /// Returns true if identical content was shown within the last 30 seconds
+  /// by ANY isolate (cross-isolate check via SharedPreferences).
+  Future<bool> _isPersistedDuplicate(String title, String body) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final int? lastShownMs =
+          prefs.getInt('fcm_dedup_${(title + body).hashCode.abs()}');
+      if (lastShownMs == null) return false;
+      return (DateTime.now().millisecondsSinceEpoch - lastShownMs) < 30000;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Records that a notification with this content was just shown.
+  /// Updates both the in-memory cache and SharedPreferences (for cross-isolate dedup).
+  void _markContentShown(String title, String body) {
+    _contentDedupeCache['${title}_$body'] = DateTime.now();
+    // Persist for cross-isolate dedup (fire-and-forget — background handler reads this)
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setInt(
+        'fcm_dedup_${(title + body).hashCode.abs()}',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    }).catchError((_) {});
   }
 
   /// Get FCM token
@@ -249,9 +345,10 @@ class NotificationService {
   }
 
   Future<bool> saveFCMTokenToBackend({
-    required String phone,
+    String? phone,
     String? platform,
   }) async {
+    debugPrint('DEBUG: saveFCMTokenToBackend invoked (phone: $phone)');
     try {
       // Get FCM token
       final token = await getFCMToken();
@@ -282,10 +379,20 @@ class NotificationService {
     }
   }
 
-  /// Create Android notification channel
+  /// Create Android notification channels
   Future<void> _createNotificationChannel() async {
     try {
-      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      final androidImplementation =
+          _notificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      if (androidImplementation == null) {
+        debugPrint('⚠️ Android notification plugin not available');
+        return;
+      }
+
+      // Primary channel — used for all app-shown notifications
+      const AndroidNotificationChannel mainChannel = AndroidNotificationChannel(
         AppConfig.notificationChannelId,
         AppConfig.notificationChannelName,
         description: AppConfig.notificationChannelDescription,
@@ -296,20 +403,24 @@ class NotificationService {
         enableLights: true,
         ledColor: AppConfig.notificationColor,
       );
+      await androidImplementation.createNotificationChannel(mainChannel);
+      debugPrint('✅ Notification channel created: ${AppConfig.notificationChannelId}');
 
-      final androidImplementation =
-          _notificationsPlugin.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-
-      if (androidImplementation != null) {
-        await androidImplementation.createNotificationChannel(channel);
-        debugPrint(
-            '✅ Notification channel created: ${AppConfig.notificationChannelId}');
-        debugPrint('   Channel importance: ${channel.importance}');
-        debugPrint('   Channel color: ${AppConfig.notificationColor}');
-      } else {
-        debugPrint('⚠️ Android notification plugin not available');
-      }
+      // Silent sink channel — Firebase sends blank notifications (empty notification
+      // payload) to a channel called "default". By creating it ourselves with
+      // Importance.none, Android silently discards those blank notifications before
+      // they ever appear to the user.
+      const AndroidNotificationChannel silentChannel = AndroidNotificationChannel(
+        'default',
+        'Silent (Firebase fallback)',
+        description: 'Silences blank auto-notifications from Firebase',
+        importance: Importance.none,
+        playSound: false,
+        enableVibration: false,
+        showBadge: false,
+      );
+      await androidImplementation.createNotificationChannel(silentChannel);
+      debugPrint('✅ Silent fallback channel created: default (Importance.none)');
     } catch (e) {
       debugPrint('❌ Error creating notification channel: $e');
     }
@@ -357,7 +468,6 @@ class NotificationService {
     }
   }
 
-  /// Show notification in system tray
   Future<void> showNotification({
     required String title,
     required String body,
@@ -365,7 +475,18 @@ class NotificationService {
     String? imageUrl,
     String? notificationId,
   }) async {
-    debugPrint('🔔 showNotification called - Title: "$title", Body: "$body"');
+    debugPrint('🔔 showNotification invoked:');
+    debugPrint('   👉 Title: "$title"');
+    debugPrint('   👉 Body: "$body"');
+    debugPrint('   👉 Payload: $payload');
+    debugPrint('   👉 Image URL: $imageUrl');
+    debugPrint('   👉 Source ID: $notificationId');
+
+    // Guard: never show empty or generic placeholder notifications
+    if (title.trim().isEmpty || (title == 'Notification' && body.trim().isEmpty)) {
+      debugPrint('⚠️ Skipping empty/invalid notification in showNotification');
+      return;
+    }
 
     if (!_isInitialized) {
       debugPrint('⚠️ Service not initialized, initializing now...');
@@ -444,5 +565,30 @@ class NotificationService {
       debugPrint('❌ Stack trace: $stackTrace');
       rethrow;
     }
+
+    // Cancel any blank notifications that Firebase may have auto-posted before
+    // this handler ran (happens when the FCM message has a non-null but empty
+    // notification payload and the app was in background).
+    if (Platform.isAndroid) {
+      _cancelBlankNotifications(localNotificationId);
+    }
+  }
+
+  /// Finds and cancels active notifications with no title (Firebase auto-blanks).
+  /// Runs fire-and-forget so it doesn't block the caller.
+  void _cancelBlankNotifications(int ourId) {
+    final androidPlugin = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) return;
+
+    androidPlugin.getActiveNotifications().then((activeList) {
+      for (final active in activeList ?? []) {
+        if ((active.title == null || active.title!.trim().isEmpty) &&
+            active.id != ourId) {
+          _notificationsPlugin.cancel(active.id!);
+          debugPrint('🗑️ Cancelled blank Firebase auto-notification (ID: ${active.id})');
+        }
+      }
+    }).catchError((_) {});
   }
 }
