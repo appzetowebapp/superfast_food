@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:math' as math;
 import 'package:webview_master_app/config/app_config.dart';
-import 'package:webview_master_app/utils/prefs_util.dart';
-import 'package:webview_master_app/utils/status_bar_util.dart';
-import 'package:webview_master_app/utils/permission_handler_util.dart';
-import 'package:webview_master_app/utils/notification_service.dart';
 
-import 'package:webview_master_app/screens/webview_screen.dart';
-
-/// Splash Screen - Shows logo and app name for configured duration
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -17,252 +9,232 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _entranceController;
-  late AnimationController _pulseController;
-  late AnimationController _backgroundController;
-
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _pulseAnimation;
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  
+  late Animation<double> _blobScale;      
+  late Animation<double> _screenSpread;  
+  late Animation<double> _logoOpacity;   
+  late Animation<double> _loaderOpacity; 
 
   @override
   void initState() {
     super.initState();
-    _setupAnimations();
-    _navigateAfterDelay();
+    // Hide status bar during splash screen (keeps bottom nav bar if present)
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [SystemUiOverlay.bottom]);
+    _setupSuperSmoothAnimations();
   }
 
-  void _setupAnimations() {
-    // Entrance Animation (Fade + Scale)
-    _entranceController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+  void _setupSuperSmoothAnimations() {
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 2400),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _blobScale = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+        parent: _animationController,
+        curve: const Interval(0.0, 0.38, curve: Curves.easeOutBack), 
       ),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+    _screenSpread = Tween<double>(begin: 1.0, end: 16.0).animate(
       CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.0, 0.8, curve: Curves.elasticOut),
+        parent: _animationController,
+        curve: const Interval(0.45, 0.85, curve: Curves.easeInOutCubic), 
       ),
     );
 
-    // Pulse Animation (Heartbeat) - Repeats
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
-
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
+    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-        parent: _pulseController,
-        curve: Curves.easeInOutSine,
+        parent: _animationController,
+        curve: const Interval(0.15, 0.48, curve: Curves.easeIn),
       ),
     );
 
-    // Background Animation (Floating)
-    _backgroundController = AnimationController(
-      duration: const Duration(seconds: 10),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    // Start Animations
-    _entranceController.forward().then((_) {
-      _pulseController.repeat(reverse: true);
-    });
-  }
-
-  Future<void> _navigateAfterDelay() async {
-    // Total duration slightly longer than animation to enjoy the view
-    await Future.delayed(
-      const Duration(seconds: AppConfig.splashDurationSeconds + 1),
-    );
-
-    if (!mounted) return;
-
-    // Request permissions early for better UX
-    await _requestInitialPermissions();
-
-    // Navigate directly to WebViewScreen
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const WebViewScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 800),
+    _loaderOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.75, 1.0, curve: Curves.easeIn),
       ),
     );
-  }
 
-  /// Request initial permissions during splash
-  Future<void> _requestInitialPermissions() async {
-    if (!mounted) return;
-    try {
-      await PermissionHandlerUtil.requestAllPermissions();
-    } catch (e) {
-      debugPrint('Initial permission request: $e');
-    }
+    _animationController.forward();
   }
 
   @override
   void dispose() {
-    _entranceController.dispose();
-    _pulseController.dispose();
-    _backgroundController.dispose();
+    _animationController.dispose();
+    // Restore status bar and permanently lock into edge-to-edge mode ONLY on Android 15+.
+    // On Android 10-14, we use manual mode so the OS natively renders the teal status bar.
+    if (AppConfig.androidSdkInt >= 35) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    }
+    super.dispose();
+  }
+
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white, 
+      body: Stack(
+        alignment: Alignment.center,
+        children: [
+          
+          // 1. Redesigned Premium Hand-crafted Amoeba Shape
+          AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              double currentScale = _blobScale.value * _screenSpread.value;
+
+              return Transform.scale(
+                scale: currentScale,
+                child: ClipPath(
+                  clipper: PerfectAmoebaClipper(),
+                  child: Container(
+                    width: 480,  
+                    height: 480, 
+                    color: Colors.white,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // 2. Premium Logo Component
+          AnimatedBuilder(
+            animation: _logoOpacity,
+            builder: (context, child) {
+              return Opacity(
+                opacity: _logoOpacity.value,
+                child: Center(
+                  child: SizedBox(
+                    width: 250, 
+                    height: 250,
+                    child: Image.asset(
+                      AppConfig.splashLogoPath,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // 3. Bottom Loader Dots Matrix
+          Positioned(
+            bottom: 65,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _loaderOpacity,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _loaderOpacity.value, 
+                    child: const VideoStyleDotLoader(),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Custom Clipper utilizing precise control vectors to map a fluid, smooth amoebic structure
+class PerfectAmoebaClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final w = size.width;
+    final h = size.height;
+
+    // Start at a smooth dip on the top side
+    path.moveTo(w * 0.50, h * 0.25);
+
+    // Top-right smooth protrusion
+    path.cubicTo(w * 0.60, h * 0.15, w * 0.75, h * 0.10, w * 0.82, h * 0.25);
+    path.cubicTo(w * 0.88, h * 0.38, w * 0.72, h * 0.48, w * 0.85, h * 0.55);
+
+    // Mid-right fluid extension
+    path.cubicTo(w * 0.98, h * 0.62, w * 0.95, h * 0.78, w * 0.78, h * 0.82);
+
+    // Bottom asymmetric elongated pseudopodia lobe
+    path.cubicTo(w * 0.65, h * 0.85, w * 0.55, h * 0.98, w * 0.42, h * 0.90);
+    path.cubicTo(w * 0.32, h * 0.82, w * 0.35, h * 0.70, w * 0.22, h * 0.72);
+
+    // Bottom-left wide organic curve
+    path.cubicTo(w * 0.08, h * 0.75, w * 0.02, h * 0.55, w * 0.15, h * 0.45);
+
+    // Upper-left smooth arm wrapping back around the logo area
+    path.cubicTo(w * 0.25, h * 0.38, w * 0.12, h * 0.20, w * 0.32, h * 0.22);
+    path.cubicTo(w * 0.42, h * 0.24, w * 0.45, h * 0.30, w * 0.50, h * 0.25);
+
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class VideoStyleDotLoader extends StatefulWidget {
+  const VideoStyleDotLoader({super.key});
+
+  @override
+  State<VideoStyleDotLoader> createState() => _VideoStyleDotLoaderState();
+}
+
+class _VideoStyleDotLoaderState extends State<VideoStyleDotLoader> with SingleTickerProviderStateMixin {
+  late AnimationController _dotController;
+
+  @override
+  void initState() {
+    super.initState();
+    _dotController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _dotController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Set system UI to immersive/transparent with light content
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light, // Light icons for dark bg
-        statusBarBrightness: Brightness.dark, // for iOS
-        systemNavigationBarColor: Color(0xFFB3B3B3), // Dark nav bar
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-    );
+    return AnimatedBuilder(
+      animation: _dotController,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (index) {
+            double delay = index * 0.2;
+            double progress = (_dotController.value - delay);
+            if (progress < 0) progress += 1.0;
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 1. Deep Navy Gradient Background
-          Container(
-            decoration: const BoxDecoration(color: Color(0xFFB3B3B3)),
-          ),
+            double scaleOpacity = Curves.easeInOut.transform(
+              progress <= 0.5 ? progress * 2 : (1.0 - progress) * 2,
+            );
 
-          // 2. Animated Floating Soft Glows
-          AnimatedBuilder(
-            animation: _backgroundController,
-            builder: (context, child) {
-              return Stack(
-                children: [
-                  // Pink Abstract Shape (Top Left)
-                  Positioned(
-                    top: -100 + (_backgroundController.value * 20),
-                    left: -50 + (_backgroundController.value * 10),
-                    child: Opacity(
-                      opacity: 0.15,
-                      child: Container(
-                        width: 300,
-                        height: 300,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Color(0xFFB3B3B3), // Accent Pink
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Cyan/Teal Abstract Shape (Bottom Right)
-                  Positioned(
-                    bottom: -80 - (_backgroundController.value * 20),
-                    right: -40 - (_backgroundController.value * 10),
-                    child: Opacity(
-                      opacity: 0.1,
-                      child: Container(
-                        width: 400,
-                        height: 400,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Color(0xFFB3B3B3),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-
-          // 3. Central Content (Logo + Text)
-          Center(
-            child: AnimatedBuilder(
-              animation:
-                  Listenable.merge([_entranceController, _pulseController]),
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeAnimation.value,
-                  child: Transform.scale(
-                    // Combined scale from entrance and pulse
-                    scale: _scaleAnimation.value * _pulseAnimation.value,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Card/Container for Logo
-                        Container(
-                          width: 180,
-                          height: 180,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 30,
-                                offset: const Offset(0, 10),
-                              ),
-                              BoxShadow(
-                                color: const Color(0xFFB3B3B3).withOpacity(0.3),
-                                blurRadius: 50,
-                                spreadRadius: -10,
-                                offset: const Offset(0, 0),
-                              ),
-                            ],
-                          ),
-                          // Display Logo
-                          child: ClipOval(
-                            child: Image.asset(
-                              AppConfig.appLogoPath,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-                        // Typography
-                        const Text(
-                          AppConfig.appName,
-                          style: TextStyle(
-                            fontFamily:
-                                'Inter', // Fallback to default if not available
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 4.0, // Increased spacing
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 5.0),
+              width: 5.5,
+              height: 5.5,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.25 + (scaleOpacity * 0.75)),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
