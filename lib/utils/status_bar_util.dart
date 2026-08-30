@@ -5,36 +5,47 @@ import 'package:webview_master_app/config/app_config.dart';
 /// Utility class for managing status bar styling
 /// All status bar colors can be configured in AppConfig
 class StatusBarUtil {
-  /// Update status bar based on theme (Light/Dark)
+  /// The SystemUiOverlayStyle for the app's primary teal theme.
+  /// Light icons are used because the teal header is a dark-ish color.
+  static SystemUiOverlayStyle get appThemeStyle => const SystemUiOverlayStyle(
+        statusBarColor: AppConfig.appThemeStatusBarColor,
+        statusBarIconBrightness: Brightness.light, // light icons on teal
+        statusBarBrightness: Brightness.dark, // iOS: dark bg = light icons
+        systemNavigationBarColor: AppConfig.navigationBarColorLight,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      );
+
+  /// The SystemUiOverlayStyle for the app's dark variant teal theme.
+  static SystemUiOverlayStyle get appThemeDarkStyle =>
+      const SystemUiOverlayStyle(
+        statusBarColor: AppConfig.appThemeStatusBarColorDark,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: AppConfig.navigationBarColorDark,
+        systemNavigationBarIconBrightness: Brightness.light,
+      );
+
+  /// Update status bar based on theme — always uses the teal brand color.
+  /// On light theme: teal bar with light icons (matching the website header).
+  /// On dark theme: dark teal bar with light icons.
   static void updateStatusBar(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    SystemChrome.setSystemUIOverlayStyle(
-      SystemUiOverlayStyle(
-        statusBarColor: isDark
-            ? AppConfig.statusBarColorDark
-            : AppConfig.statusBarColorLight,
-        statusBarIconBrightness: isDark
-            ? AppConfig.statusBarIconBrightnessDark
-            : AppConfig.statusBarIconBrightnessLight,
-        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-        systemNavigationBarColor: isDark
-            ? AppConfig.navigationBarColorDark
-            : AppConfig.navigationBarColorLight,
-        systemNavigationBarIconBrightness: isDark
-            ? AppConfig.navigationBarIconBrightnessDark
-            : AppConfig.navigationBarIconBrightnessLight,
-      ),
-    );
+    SystemChrome.setSystemUIOverlayStyle(isDark ? appThemeDarkStyle : appThemeStyle);
   }
 
-  /// Set status bar for splash screen (always light icons on gradient)
+  /// Set status bar to the app's primary teal theme color imperatively.
+  /// Call this from initState / didChangeDependencies when needed.
+  static void setAppThemeStatusBar({bool isDark = false}) {
+    SystemChrome.setSystemUIOverlayStyle(isDark ? appThemeDarkStyle : appThemeStyle);
+  }
+
+  /// Set status bar for splash screen (transparent on white bg → dark icons)
   static void setSplashStatusBar() {
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
         systemNavigationBarColor: Colors.transparent,
         systemNavigationBarIconBrightness: Brightness.light,
       ),
@@ -44,7 +55,7 @@ class StatusBarUtil {
   /// Set status bar for light theme
   static void setLightStatusBar() {
     SystemChrome.setSystemUIOverlayStyle(
-     const SystemUiOverlayStyle(
+      const SystemUiOverlayStyle(
         statusBarColor: AppConfig.statusBarColorLight,
         statusBarIconBrightness: AppConfig.statusBarIconBrightnessLight,
         statusBarBrightness: Brightness.light,

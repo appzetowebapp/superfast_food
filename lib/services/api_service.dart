@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:webview_master_app/config/app_config.dart';
 import 'package:webview_master_app/utils/prefs_util.dart';
+import 'dart:io' show Platform;
 
 /// API Service - Handles all API calls to the backend
 class ApiService {
@@ -13,7 +12,7 @@ class ApiService {
   ApiService._internal();
 
   /// Get the full API URL for an endpoint
-  String _getApiUrl(String endpoint) {
+  String getApiUrl(String endpoint) {
     // Remove leading slash if present to avoid double slashes
     final cleanEndpoint =
         endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
@@ -23,41 +22,32 @@ class ApiService {
   /// Save FCM token to backend
   ///
   /// [token] - The FCM token to save
-  /// [phone] - Phone number (10-digit without +91)
+  /// [phone] - Optional phone number (10-digit without +91)
   /// [platform] - Platform identifier (defaults to "android" for Android)
   ///
   /// Returns true if successful, false otherwise
   Future<bool> saveFCMToken({
     required String token,
-    required String phone,
+    String? phone,
     String? platform,
   }) async {
     try {
-      debugPrint('🚀 ApiService.saveFCMToken started');
-      debugPrint('📱 Target Phone: $phone');
-      debugPrint('🔑 FCM Token: ${token.substring(0, 10)}...');
-
       // Determine platform if not provided
-      final platformValue = platform ?? (Platform.isAndroid ? 'android' : 'ios');
+      final platformValue =
+          platform ?? (Platform.isAndroid ? 'android' : 'ios');
 
-      // Validate phone number (should be 10 digits)
-      if (phone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(phone)) {
-        debugPrint(
-            '❌ Invalid phone number format. Expected 10 digits, got: $phone');
-        return false;
+      // Validate phone number if provided
+      if (phone != null && phone.isNotEmpty) {
+        if (phone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(phone)) {
+          debugPrint(
+              '⚠️ Phone number provided but not 10 digits: $phone. Continuing with token save...');
+        }
       }
       final url = AppConfig.fcmTokenUrl;
 
-      final String? storedUserId = PrefsUtil.getUserId();
-      
       final requestBody = {
         'token': token,
-        'fcmToken': token,
-        'fcmTokenMobile': token, // Added based on user object schema
         'platform': 'mobile',
-        'deviceType': Platform.isAndroid ? 'android' : 'ios',
-        'phone': phone,
-        'userId': storedUserId ?? phone,
       };
 
       // Validate token
@@ -66,24 +56,15 @@ class ApiService {
         return false;
       }
 
-      //final url = _getApiUrl('auth/fcm-token');
-
       // Get access token
       String? accessToken = PrefsUtil.getAccessToken();
-      if (accessToken == null) {
+      if (accessToken == null || accessToken.isEmpty) {
         debugPrint('⚠️ Access token not found. Cannot save FCM token.');
-
         return false;
       }
 
       debugPrint('📤 Saving FCM token to: $url');
-
-      // final requestBody = {
-      //   //  'token': token,
-      //   'fcmToken': token,
-      //   'platform': 'mobile',
-      //   // 'platform': platformValue,
-      // };
+      debugPrint('📤 Request Body: ${jsonEncode(requestBody)}');
 
       final response = await http
           .post(
@@ -102,9 +83,6 @@ class ApiService {
           throw Exception('Request timeout');
         },
       );
-
-      debugPrint('📤 requestBody: ${jsonEncode(requestBody)}');
-      debugPrint('🆔 Sending userId: ${requestBody['userId']}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         debugPrint('✅ FCM token saved successfully');

@@ -192,15 +192,15 @@ class _ExitDialogWidgetState extends State<_ExitDialogWidget>
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          AppConfig.exitDialogButtonColor,
-                          AppConfig.exitDialogButtonColor.withOpacity(0.8),
+                          AppConfig.exitDialogButtonChangedColor,
+                          AppConfig.exitDialogButtonChangedColor.withOpacity(0.8),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
                           color:
-                              AppConfig.exitDialogButtonColor.withOpacity(0.3),
+                              AppConfig.exitDialogButtonChangedColor.withOpacity(0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
